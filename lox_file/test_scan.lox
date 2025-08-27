@@ -1,0 +1,10 @@
+// This is a comment
+print "Hello, world!";
+var x = 123.45;
+if (x > 100) {
+    print "Large number: " + x;
+}
+
+for (var i = 0; i < 5; i = i + 1) {
+    print i;
+}

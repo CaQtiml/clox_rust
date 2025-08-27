@@ -6,6 +6,8 @@ mod test_helpers;
 mod opcode;
 // mod memory;
 mod vm;
+mod compiler;
+mod scanner;
 
 use chunk::{Chunk};
 use debug::disassemble_chunk;
@@ -14,85 +16,68 @@ use test_helpers::{create_simple_chunk, verify_chunk_structure};
 use test_helpers::{create_arithmetic_chunk, create_complex_arithmetic_chunk, create_complex_arithmetic_divide_zero_chunk};
 use vm::{VM, InterpretResult};
 
-fn main() -> anyhow::Result<()> {
-    println!("=== Basic Constant Test ===");
-    test_simple_constant()?;
-    
-    println!("\n=== Arithmetic Test: -(1.2 + 3.4) ===");
-    test_arithmetic()?;
+use std::env;
+use std::fs;
+use std::io::{self, Write};
+use std::process;
 
-    // println!("\n=== Complex Arithmetic Test Divided by Zero: ((1 + 2) * 3 - 4)/0 ===");
-    // test_complex_arithmetic_divide_zero()?;
-    
-    println!("\n=== Complex Arithmetic Test: ((1 + 2) * 3 - 4)/4 ===");
-    test_complex_arithmetic()?;
 
+fn main() {
+    let args: Vec<String> = env::args().collect();
     
-    
-    Ok(())
-}
-
-fn test_simple_constant() -> anyhow::Result<()> {
-    let chunk = create_simple_chunk();
-    verify_chunk_structure(&chunk);
-    
-    println!("--- Disassembly ---");
-    disassemble_chunk(&chunk, "simple constant");
-    
-    println!("--- VM Execution ---");
     let mut vm = VM::new();
-    execute_chunk(&mut vm, chunk)?;
     
-    Ok(())
-}
-
-fn test_arithmetic() -> anyhow::Result<()> {
-    let chunk = create_arithmetic_chunk();
-    verify_chunk_structure(&chunk);
-    
-    println!("--- Disassembly ---");
-    disassemble_chunk(&chunk, "arithmetic test");
-    
-    println!("--- VM Execution ---");
-    let mut vm = VM::new();
-    execute_chunk(&mut vm, chunk)?;
-    
-    Ok(())
-}
-
-fn test_complex_arithmetic() -> anyhow::Result<()> {
-    let chunk = create_complex_arithmetic_chunk();
-    verify_chunk_structure(&chunk);
-    
-    println!("--- Disassembly ---");
-    disassemble_chunk(&chunk, "complex arithmetic");
-    
-    println!("--- VM Execution ---");
-    let mut vm = VM::new();
-    execute_chunk(&mut vm, chunk)?;
-    
-    Ok(())
-}
-
-fn test_complex_arithmetic_divide_zero() -> anyhow::Result<()> {
-    let chunk = create_complex_arithmetic_divide_zero_chunk();
-    verify_chunk_structure(&chunk);
-    
-    println!("--- Disassembly ---");
-    disassemble_chunk(&chunk, "complex arithmetic divided by zero");
-    
-    println!("--- VM Execution ---");
-    let mut vm = VM::new();
-    execute_chunk(&mut vm, chunk)?;
-    
-    Ok(())
-}
-
-fn execute_chunk(vm: &mut VM, chunk: Chunk) -> anyhow::Result<()> {
-    match vm.interpret(chunk)? {
-        InterpretResult::Ok => println!("✓ Execution completed successfully"),
-        InterpretResult::RuntimeError => println!("✗ Runtime error occurred"),
-        InterpretResult::CompileError => println!("✗ Compile error occurred"),
+    match args.len() {
+        1 => repl(&mut vm),
+        2 => run_file(&mut vm, &args[1]),
+        _ => {
+            eprintln!("Usage: {} [path]", args[0]);
+            process::exit(64);
+        }
     }
-    Ok(())
+}
+
+fn repl(vm: &mut VM) {
+    loop {
+        print!("> ");
+        io::stdout().flush().unwrap();
+        
+        let mut line = String::new();
+        match io::stdin().read_line(&mut line) {
+            Ok(0) => {
+                println!();
+                break;
+            },
+            Ok(_) => {
+                run_source(vm, line.trim().to_string());
+            },
+            Err(_) => {
+                println!();
+                break;
+            }
+        }
+    }
+}
+
+fn run_file(vm: &mut VM, path: &str) {
+    let source = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(_) => {
+            eprintln!("Could not open file \"{}\".", path);
+            process::exit(74);
+        }
+    };
+    
+    let result = run_source(vm, source);
+    
+    match result {
+        InterpretResult::CompileError => process::exit(65),
+        InterpretResult::RuntimeError => process::exit(70),
+        InterpretResult::Ok => {},
+    }
+}
+
+fn run_source(_vm: &mut VM, source: String) -> InterpretResult {
+    compiler::compile(source);
+    InterpretResult::Ok
 }
