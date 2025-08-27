@@ -32,6 +32,7 @@ impl VM {
     pub fn interpret(&mut self, chunk: Chunk) -> Result<InterpretResult> {
         self.chunk = Some(chunk);
         self.ip = 0;
+        self.reset_stack();
         self.run()
     }
     
@@ -48,10 +49,37 @@ impl VM {
                     OpCode::Constant => {
                         let constant = self.read_constant();
                         println!("Loading constant: {}", constant);
+                        self.push(constant)?;
                     }
                     OpCode::Return => {
-                        println!("Returning from VM");
+                        let value = self.pop()?;
+                        print_value(value);
+                        println!();
                         return Ok(InterpretResult::Ok);
+                    }
+                    OpCode::Negate => {
+                        let value = self.pop()?;
+                        let negate_value = -value;
+                        print_value(negate_value);
+                        self.push(negate_value)?;
+                    }
+                    OpCode::Add => {
+                        self.binary_op(|a, b| a + b)?;
+                    }
+                    OpCode::Subtract => {
+                        self.binary_op(|a, b| a - b)?;
+                    }
+                    OpCode::Multiply => {
+                        self.binary_op(|a, b| a * b)?;
+                    }
+                    OpCode::Divide => {
+                        self.binary_op_with_check(|a, b| {
+                            if b == 0.0 {
+                                Err("Division by zero".to_string())
+                            } else {
+                                Ok(a / b)
+                            }
+                        })?;
                     }
                 },
                 Err(_) => {
@@ -78,6 +106,45 @@ impl VM {
         // Don't forget that constant byte in `Chunk` is only an index refering to `constants`
         let chunk = self.chunk.as_ref().expect("No Chunk Loaded");
         *(chunk.constants().get(constant_index).expect("Invalid constant index"))
+    }
+
+    fn push(&mut self, value: Value) -> Result<()> {
+        if self.stack.len() >= STACK_MAX {
+            bail!("Stack overflow");
+        }
+        self.stack.push(value);
+        Ok(())
+    }
+
+    fn pop(&mut self) -> Result<Value> {
+        self.stack.pop().ok_or_else(|| anyhow::anyhow!("Stack underflow"))
+    }
+
+    fn reset_stack(&mut self) {
+        self.stack.clear();
+    }
+
+    fn binary_op<F>(&mut self, op: F) -> Result<()>
+    where
+        F: FnOnce(Value, Value) -> Value,
+    {
+        let b = self.pop()?;
+        let a = self.pop()?;
+        self.push(op(a, b))?;
+        Ok(())
+    }
+
+    fn binary_op_with_check<F>(&mut self, op: F) -> Result<()>
+    where
+        F: FnOnce(Value, Value) -> Result<Value, String>,
+    {
+        let b = self.pop()?;
+        let a = self.pop()?;
+        match op(a, b) {
+            Ok(result) => self.push(result)?,
+            Err(error) => bail!("{}", error),
+        }
+        Ok(())
     }
 
     fn debug_trace_execution(&self) {

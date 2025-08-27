@@ -16,8 +16,9 @@ How to run:
 
 Progress
 - [x] Chunks of Bytecode
-- [ ] A Virtual Machine
-- [ ]...
+- [x] A Virtual Machine
+- [ ] Scanning on Demand
+- [ ] ...
 
 Note to myself: I use Git on Ubuntu.
 

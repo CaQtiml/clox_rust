@@ -62,7 +62,7 @@ impl Default for ValueArray {
 }
 
 pub fn print_value(value: Value) {
-    print!("{}", value);
+    println!("{}", value);
 }
 
 // Helper function for formatting values in disassembly
