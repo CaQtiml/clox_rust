@@ -32,7 +32,7 @@ pub struct Token {
 }
 
 pub struct Scanner {
-    source: String,
+    // source: String,
     chars: Vec<char>, // The vector of source code's character
     start: usize, // Start of current token being scanned
     // Example: When scanning "print", start points to 'p'
@@ -44,7 +44,7 @@ impl Scanner {
     pub fn new(source: String) -> Self {
         let chars: Vec<char> = source.chars().collect();
         Scanner {
-            source,
+            // source,
             chars,
             start: 0,
             current: 0,

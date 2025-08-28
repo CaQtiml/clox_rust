@@ -17,10 +17,14 @@ How to run:
 Progress
 - [x] Chunks of Bytecode
 - [x] A Virtual Machine
-- [ ] Scanning on Demand
+- [x] Scanning on Demand
+- [x] Compiling Expressions
+- [ ] Types of Values
 - [ ] ...
 
-Note to myself: I use Git on Ubuntu.
+Notes to myself: 
+- I use Git on Windows. Run all git commands on Windows Terminal.
+- I compile and run code on WSL.
 
 If you want to navigate to the result of each chapter, you can use
 ```

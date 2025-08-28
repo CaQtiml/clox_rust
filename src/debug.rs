@@ -66,6 +66,6 @@ fn constant_instruction(name: &str, chunk: &Chunk, offset: usize) -> usize {
         print!("INVALID_CONSTANT");
     }
     
-    println!("'");
+    // println!("'");
     offset + 2 // Because CONSTANT has a size of 2 bytes.
 }
