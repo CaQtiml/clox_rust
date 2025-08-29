@@ -61,7 +61,7 @@ impl Default for ValueArray {
     }
 }
 
-pub fn print_value(value: Value) {
+pub fn print_value(value: &Value) {
     println!("{}", value);
 }
 

@@ -1,8 +1,8 @@
 use crate::{chunk::Chunk, opcode::OpCode};
 use crate::common::Value;
 use crate::value::print_value;
-use crate::debug::{disassemble_chunk, disassemble_instruction};
-use anyhow::{Result, bail};
+use crate::debug::{disassemble_instruction};
+use anyhow::{bail, Result};
 
 const STACK_MAX: usize = 256;
 
@@ -51,35 +51,87 @@ impl VM {
                         println!("Loading constant: {}", constant);
                         self.push(constant)?;
                     }
+                    OpCode:: True => {
+                        print_value(&Value::Bool(true));
+                        self.push(Value::Bool(true))?;
+                    }
+                    OpCode:: False => {
+                        print_value(&Value::Bool(false));
+                        self.push(Value::Bool(false))?;
+                    }
+                    OpCode:: Nil => {
+                        print_value(&Value::Nil);
+                        self.push(Value::Nil)?;
+                    }
                     OpCode::Return => {
                         let value = self.pop()?;
-                        print_value(value);
+                        print_value(&value);
                         println!();
                         return Ok(InterpretResult::Ok);
                     }
                     OpCode::Negate => {
                         let value = self.pop()?;
-                        let negate_value = -value;
-                        print_value(negate_value);
-                        self.push(negate_value)?;
+                        // let negate_value = -value;
+                        // print_value(negate_value);
+                        // self.push(negate_value)?;
+                        match value {
+                            Value::Number(x) => {
+                                print_value(&Value::Number(-x));
+                                self.push(Value::Number(-x));
+                            }
+                            _ => bail!("Operand must be a number."),
+                        }
                     }
                     OpCode::Add => {
-                        self.binary_op(|a, b| a + b)?;
+                        self.binary_op_with_check(|a, b| match (a, b) {
+                            (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+                            _ => Err("Operands must be numbers.".to_string()),
+                        })?;
                     }
                     OpCode::Subtract => {
-                        self.binary_op(|a, b| a - b)?;
+                        self.binary_op_with_check(|a, b| match (a, b) {
+                            (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a - b)),
+                            _ => Err("Operands must be numbers.".to_string()),
+                        })?;
                     }
                     OpCode::Multiply => {
-                        self.binary_op(|a, b| a * b)?;
+                        self.binary_op_with_check(|a, b| match (a, b) {
+                            (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a * b)),
+                            _ => Err("Operands must be numbers.".to_string()),
+                        })?;
                     }
                     OpCode::Divide => {
-                        self.binary_op_with_check(|a, b| {
-                            if b == 0.0 {
-                                Err("Division by zero".to_string())
-                            } else {
-                                Ok(a / b)
-                            }
+                        self.binary_op_with_check(|a, b| match (a, b) {
+                            (Value::Number(a), Value::Number(b)) => {
+                                if b == 0.0 {
+                                    Err("Division by zero".to_string())
+                                } else {
+                                    Ok(Value::Number(a / b))
+                                }
+                            },
+                            _ => Err("Operands must be numbers.".to_string()),
                         })?;
+                    }
+                    OpCode:: Not => {
+                        let value = self.pop()?;
+                        self.push(Value::Bool(value.is_falsy()))?;
+                    }
+                    OpCode:: Greater => {
+                        self.binary_op_with_check(|a, b| match (a, b) {
+                            (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a > b)),
+                            _ => Err("Operands must be numbers.".to_string()),
+                        })?;
+                    }
+                    OpCode:: Less => {
+                        self.binary_op_with_check(|a, b| match (a, b) {
+                            (Value::Number(a), Value::Number(b)) => Ok(Value::Bool(a < b)),
+                            _ => Err("Operands must be numbers.".to_string()),
+                        })?;
+                    }
+                    OpCode:: Equal => {
+                        let b = self.pop()?;
+                        let a = self.pop()?;
+                        self.push(Value::Bool(a == b))?;
                     }
                 },
                 Err(_) => {
@@ -105,7 +157,7 @@ impl VM {
         let constant_index = self.read_byte() as usize;
         // Don't forget that constant byte in `Chunk` is only an index refering to `constants`
         let chunk = self.chunk.as_ref().expect("No Chunk Loaded");
-        *(chunk.constants().get(constant_index).expect("Invalid constant index"))
+        chunk.constants().get(constant_index).expect("Invalid constant index").clone()
     }
 
     fn push(&mut self, value: Value) -> Result<()> {
@@ -122,16 +174,6 @@ impl VM {
 
     fn reset_stack(&mut self) {
         self.stack.clear();
-    }
-
-    fn binary_op<F>(&mut self, op: F) -> Result<()>
-    where
-        F: FnOnce(Value, Value) -> Value,
-    {
-        let b = self.pop()?;
-        let a = self.pop()?;
-        self.push(op(a, b))?;
-        Ok(())
     }
 
     fn binary_op_with_check<F>(&mut self, op: F) -> Result<()>

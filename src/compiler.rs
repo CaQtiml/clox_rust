@@ -58,8 +58,8 @@ impl Parser {
     fn new() -> Self {
         Self {
             current: Token {
-                token_type: TokenType::Eof,
-                lexeme: String::new(),
+                token_type: TokenType::Eof, // TokenType (such as LeftParen)
+                lexeme: String::new(), // What is this token represents for in your code (such as '(')
                 line: 0,
             },
             previous: Token {
@@ -187,10 +187,21 @@ impl Compiler {
         }
     }
 
+    fn literal(&mut self) {
+        match self.parser.previous.token_type {
+            TokenType::False => self.emit_opcode(OpCode::False),
+            TokenType::True => self.emit_opcode(OpCode::True),
+            TokenType::Nil => self.emit_opcode(OpCode::Nil),
+            _ => unreachable!()
+        }
+    }
+
     fn number(&mut self) {
         let value: f64 = self.parser.previous.lexeme.parse()
             .expect("Failed to parse number");
-        self.emit_constant(value);
+        // we use .previous because parse_precedence has already advanced past the number token, 
+        // moving it from current to previous before calling our parsing function.
+        self.emit_constant(Value::Number(value));
     }
 
     fn unary(&mut self) {
@@ -202,6 +213,7 @@ impl Compiler {
         // Emit the operator instruction
         match operator_type {
             TokenType::Minus => self.emit_opcode(OpCode::Negate),
+            TokenType::Bang => self.emit_opcode(OpCode::Not),
             _ => unreachable!(),
         }
     }
@@ -222,6 +234,22 @@ impl Compiler {
             TokenType::Minus => self.emit_opcode(OpCode::Subtract),
             TokenType::Star => self.emit_opcode(OpCode::Multiply),
             TokenType::Slash => self.emit_opcode(OpCode::Divide),
+            TokenType::EqualEqual => self.emit_opcode(OpCode::Equal),
+            TokenType::Greater => self.emit_opcode(OpCode::Greater),
+            TokenType::Less => self.emit_opcode(OpCode::Less),
+            TokenType::BangEqual => {
+                self.emit_opcode(OpCode::Equal);
+                self.emit_opcode(OpCode::Not);
+            },
+            TokenType::LessEqual => {   // Less Equal means negate of greater
+                self.emit_opcode(OpCode::Greater); // Instruction does greater first
+                self.emit_opcode(OpCode::Not); // Then, negate it
+            },
+            TokenType::GreaterEqual => {
+                self.emit_opcode(OpCode::Less);
+                self.emit_opcode(OpCode::Not);
+            },
+
             _ => unreachable!(),
         }
     }
@@ -266,6 +294,46 @@ impl Compiler {
                 prefix: None, 
                 infix: Some(Compiler::binary), 
                 precedence: Precedence::Factor  // Slash has a precedence of "Factor" 
+            },
+            Bang => &ParseRule {
+                prefix: Some(Compiler::unary),
+                infix: None,
+                precedence: Precedence::None
+            },
+            BangEqual => &ParseRule {
+                prefix: None,
+                infix: Some(Compiler::binary),
+                precedence: Precedence::Equality
+            },
+            EqualEqual => &ParseRule {
+                prefix: None,
+                infix: Some(Compiler::binary),
+                precedence: Precedence::Equality
+            },
+            Greater => &ParseRule {
+                prefix: None,
+                infix: Some(Compiler::binary),
+                precedence: Precedence::Comparison
+            },
+            GreaterEqual => &ParseRule {
+                prefix: None,
+                infix: Some(Compiler::binary),
+                precedence: Precedence::Comparison
+            },
+            Less => &ParseRule {
+                prefix: None,
+                infix: Some(Compiler::binary),
+                precedence: Precedence::Comparison
+            },
+            LessEqual => &ParseRule {
+                prefix: None,
+                infix: Some(Compiler::binary),
+                precedence: Precedence::Comparison
+            },
+            False | True | Nil => &ParseRule { 
+                prefix: Some(Compiler::literal), 
+                infix: None, 
+                precedence: Precedence::None 
             },
             _ => &ParseRule { 
                 prefix: None, 
